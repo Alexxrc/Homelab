@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Homelab Network Map</title>
+<style>
+  :root{
+    --bg:#0b1020; --panel:#121a30; --panel2:#18223d; --line:#2a3658; --text:#e8ecf8; --muted:#8f9bbd;
+    --zone:#0f1730; --zone-stroke:#26335a; --glow:.55;
+    --net:#f59e0b; --compute:#8b5cf6; --sys:#14b8a6; --media:#ec4899; --fin:#22c55e;
+    --proj:#3b82f6; --ctrl:#f97316; --ext:#94a3b8; --game:#a3a3a3;
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#f3f5fb; --panel:#ffffff; --panel2:#eef1f9; --line:#d5dbec; --text:#16203c; --muted:#5b6788;
+      --zone:#f8f9fe; --zone-stroke:#cfd6ea; --glow:.25; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:1280px;margin:0 auto;padding:28px 16px 48px}
+  header h1{margin:0;font-size:clamp(24px,4vw,36px);letter-spacing:-.02em}
+  header p{margin:6px 0 0;color:var(--muted);max-width:760px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 6px}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:13px;color:var(--muted)}
+  .chip b{color:var(--text);font-weight:650}
+  .tabs{display:flex;flex-wrap:wrap;gap:8px;margin:20px 0 14px}
+  .tab{appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--text);padding:9px 14px;border-radius:10px;
+       font:inherit;font-size:14px;cursor:pointer;transition:.15s}
+  .tab:hover{border-color:var(--muted)}
+  .tab[aria-selected="true"]{background:var(--c,var(--proj));border-color:transparent;color:#fff;font-weight:600}
+  .map{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow-x:auto}
+  svg{display:block;width:100%;min-width:820px;height:auto}
+  .zone{fill:var(--zone);stroke:var(--zone-stroke);stroke-width:1.2;stroke-dasharray:4 5}
+  .zone-label{fill:var(--muted);font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:600}
+  .link{stroke:var(--line);stroke-width:2;fill:none}
+  .link-label{fill:var(--muted);font-size:10px}
+  .node{cursor:pointer;transition:opacity .25s}
+  .node rect{fill:var(--panel2);stroke:var(--c);stroke-width:1.5;transition:.2s}
+  .node .bar{fill:var(--c);stroke:none}
+  .node:hover rect.body, .node.sel rect.body{filter:drop-shadow(0 0 8px var(--c));stroke-width:2.2}
+  .node text.t{fill:var(--text);font-size:12.5px;font-weight:650}
+  .node text.s{fill:var(--muted);font-size:10.5px}
+  .dim{opacity:.28}
+  .active rect.body{filter:drop-shadow(0 0 calc(10px*var(--glow)*2) var(--c))}
+  .hop{fill:none;stroke:var(--hc);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
+  .hop.flow{stroke-dasharray:7 7;animation:dash 1s linear infinite}
+  .hop.coord{stroke-dasharray:2 6;opacity:.7}
+  .hop.hl{stroke-width:4.2;opacity:1}
+  .hop.fade{opacity:.2}
+  .dot{fill:var(--hc)}
+  .badge circle{fill:var(--hc)} .badge text{fill:#fff;font-size:11px;font-weight:700;text-anchor:middle}
+  @keyframes dash{to{stroke-dashoffset:-14}}
+  @media (prefers-reduced-motion: reduce){ .hop.flow{animation:none} }
+  .below{display:grid;grid-template-columns:1.2fr 1fr;gap:16px;margin-top:16px}
+  @media (max-width:860px){ .below{grid-template-columns:1fr} }
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+  .card h2{margin:0 0 4px;font-size:17px}
+  .card .sub{margin:0 0 12px;color:var(--muted);font-size:13.5px}
+  ol.steps{margin:0;padding:0;list-style:none;counter-reset:s}
+  ol.steps li{counter-increment:s;display:flex;gap:12px;padding:9px 10px;border-radius:9px;cursor:default;transition:.15s}
+  ol.steps li:hover{background:var(--panel2)}
+  ol.steps li::before{content:counter(s);flex:none;width:24px;height:24px;border-radius:50%;background:var(--hc,var(--proj));color:#fff;
+       font-size:12px;font-weight:700;display:grid;place-items:center;margin-top:1px}
+  ol.steps li span{font-size:14.5px}
+  ol.steps li small{display:block;color:var(--muted);font-size:12.5px}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:10px 0 0;font-size:14px}
+  .kv dt{color:var(--muted)} .kv dd{margin:0;word-break:break-word}
+  .tag{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:600;color:#fff;background:var(--c)}
+  footer{margin-top:22px;color:var(--muted);font-size:12.5px}
+  code{background:var(--panel2);padding:1px 6px;border-radius:5px;font-size:.92em}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Homelab · mapa de red</h1>
+    <p>Desde el router del ISP hasta cada servicio: cómo entra el tráfico público, cómo llego yo de forma privada y cómo se resuelve un dominio <code>.lab</code> dentro de casa. Pulsa un escenario o haz clic en cualquier nodo.</p>
+    <div class="chips">
+      <span class="chip"><b>27</b> contenedores activos</span>
+      <span class="chip"><b>i5-8500</b> · 8 GB · SSD 480 GB</span>
+      <span class="chip">Proxmox <b>9.2</b></span>
+      <span class="chip">RouterOS <b>6.49</b></span>
+      <span class="chip">Doble NAT · <b>VLAN 10</b></span>
+    </div>
+  </header>
+
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <div class="map"><svg id="svg" viewBox="0 0 1190 740" role="img" aria-label="Diagrama de red del homelab"></svg></div>
+
+  <div class="below">
+    <section class="card" id="stepsCard">
+      <h2 id="scTitle"></h2><p class="sub" id="scSub"></p>
+      <ol class="steps" id="steps"></ol>
+    </section>
+    <section class="card" id="infoCard">
+      <h2 id="inName">Selecciona un nodo</h2><p class="sub" id="inRole">Haz clic en cualquier elemento del mapa para ver su detalle.</p>
+      <dl class="kv" id="inKv"></dl>
+    </section>
+  </div>
+
+  <footer>Datos verificados por SSH de solo lectura (MikroTik, Proxmox y VM de servicios). El router del ISP no se ha auditado: su configuración (Wi-Fi, reenvíos de puertos) es una suposición razonable, no un dato medido.</footer>
+</div>
+
+<script>
+const NS="http://www.w3.org/2000/svg";
+const css=n=>`var(--${n})`;
+const el=(t,a={},p)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e};
+const svg=document.getElementById("svg");
+const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---------- datos ---------- */
+const CAT={ext:"Internet",isp:"Router ISP",net:"Red",compute:"Cómputo",sys:"Red y sistema",media:"Media y nube",fin:"Finanzas",proj:"Proyecto propio",ctrl:"Control PC",game:"Ocio"};
+const N=[
+ // internet
+ {id:"visitor",x:30,y:110,w:165,h:64,t:"Visitante público",s:"navegador",c:"ext",role:"Cualquier persona que abre mis webs públicas.",kv:{Entra_por:"Cloudflare (HTTPS)",Ve:"portfolio y apps publicadas"}},
+ {id:"cf",x:30,y:230,w:165,h:64,t:"Cloudflare",s:"DNS · túnel · HTTPS",c:"ext",role:"Recibe el tráfico público y lo envía por un túnel que abre mi propia VM hacia fuera.",kv:{Ventaja:"no hay puertos de entrada para las webs",Protege:"la IP doméstica"}},
+ {id:"me",x:30,y:420,w:165,h:64,t:"Yo · remoto",s:"móvil / portátil",c:"ext",role:"Mis dispositivos fuera de casa, con Tailscale instalado.",kv:{Acceso:"toda la LAN 192.168.10.0/24",Cifrado:"WireGuard"}},
+ {id:"ts_ext",x:30,y:540,w:165,h:64,t:"Tailscale",s:"plano de control",c:"ext",role:"Coordina las claves y ayuda a atravesar NAT; el tráfico va cifrado de extremo a extremo.",kv:{Función:"autenticación y descubrimiento"}},
+ // isp
+ {id:"isp",x:255,y:320,w:140,h:110,t:"Router ISP",s:"192.168.1.1 · NAT",c:"net",role:"Primer salto: da Internet y Wi-Fi a casa. El MikroTik cuelga de él (doble NAT).",kv:{IP:"192.168.1.1",Red:"192.168.1.0/24",Estado:"no auditado"}},
+ {id:"wifi",x:255,y:485,w:140,h:70,t:"Clientes Wi-Fi",s:"192.168.1.0/24",c:"net",role:"Móviles y portátiles de casa. Una regla del MikroTik les deja llegar a la VM .96.",kv:{Regla:"forward accept 192.168.1.0/24 → .96"}},
+ // mikrotik
+ {id:"mk",x:450,y:320,w:150,h:110,t:"MikroTik hEX",s:".1 LAN · .136 WAN",c:"net",role:"Router de la LAN del homelab: VLAN 10, DHCP, firewall y NAT.",kv:{Modelo:"RB750Gr3 · RouterOS 6.49",VLAN:"10 (192.168.10.0/24)",DHCP:"entrega DNS = Pi-hole",NAT:"25565 → VM · DNS → Pi-hole",Ruta:"100.64.0.0/10 → .96 (Tailscale)"}},
+ {id:"pc",x:450,y:560,w:150,h:80,t:"PC Windows",s:".8 · WoL / SSH",c:"ctrl",role:"Mi equipo de trabajo. Se enciende por Wake-on-LAN y se apaga/reinicia por SSH desde el dashboard.",kv:{IP:"192.168.10.8",Puertos:"streaming 47984-48010 abiertos"}},
+ // services row A
+ {id:"pihole",x:705,y:165,w:130,h:52,t:"Pi-hole",s:":53 · DNS",c:"sys",role:"Único DNS de la LAN: bloquea anuncios y resuelve los dominios locales.",kv:{Puertos:"53 tcp/udp · 8080 (web)",Dominio:"pihole.lab"}},
+ {id:"cloudflared",x:860,y:165,w:130,h:52,t:"cloudflared",s:"túnel saliente",c:"sys",role:"Abre la conexión hacia Cloudflare y recibe por ahí el tráfico público.",kv:{Dirección:"saliente (sin puertos abiertos)",Destino:"Nginx Proxy Manager"}},
+ {id:"ts_vm",x:1015,y:165,w:130,h:52,t:"Tailscale",s:"subnet router",c:"sys",role:"Anuncia 192.168.10.0/24 al tailnet: desde fuera veo Proxmox, MikroTik y todos los servicios.",kv:{Contenedor:"host network + /dev/net/tun",Rutas:"192.168.10.0/24"}},
+ // npm
+ {id:"npm",x:705,y:265,w:440,h:52,t:"Nginx Proxy Manager",s:":80 · :443 · :81 (panel) — un dominio por servicio, certificados SSL",c:"sys",role:"Reverse proxy: recibe todas las peticiones web y las envía al contenedor correcto.",kv:{Dominios:"dashboard · immich · seafile · securo · pihole · nginx .lab",Público:"alejandrorobotica.me y más",Proxy_hosts:"9"}},
+ // row C
+ {id:"homepage",x:705,y:365,w:130,h:52,t:"Homepage",s:":3000 · dashboard",c:"sys",role:"Panel central: estado de servicios y botones de control del PC.",kv:{Dominio:"dashboard.lab",Widgets:"Pi-hole, NPM, Proxmox, Immich"}},
+ {id:"immich",x:860,y:365,w:130,h:52,t:"Immich",s:":2283 · fotos",c:"media",role:"Alternativa self-hosted a Google Photos.",kv:{Biblioteca:"~2.400 fotos · ~380 vídeos · 20 GiB",Versión:"v3",Stack:"server + ML + Postgres + Valkey"}},
+ {id:"seafile",x:1015,y:365,w:130,h:52,t:"Seafile",s:":8082 · nube",c:"media",role:"Almacenamiento privado en la nube.",kv:{Stack:"Seafile + MariaDB + Memcached",Dominio:"seafile.lab"}},
+ // row D
+ {id:"securo",x:705,y:455,w:130,h:52,t:"Securo",s:":3095 · finanzas",c:"fin",role:"Gestor de finanzas personales self-hosted.",kv:{Stack:"FastAPI + frontend + Celery + Postgres/pgvector + Redis",Dominio:"securo.lab"}},
+ {id:"barfinance",x:860,y:455,w:130,h:52,t:"BarFinance",s:":9091 · Flask",c:"proj",role:"App propia de gestión financiera.",kv:{Servidor:"gunicorn",Datos:"volumen local"}},
+ {id:"portfolio",x:1015,y:455,w:130,h:52,t:"Portfolio",s:":9090 · nginx",c:"proj",role:"Mi web personal. Se despliega sola con un runner de GitHub Actions instalado en la VM.",kv:{CI_CD:"GitHub Actions self-hosted",Público:"alejandrorobotica.me"}},
+ // row E
+ {id:"avalohost",x:705,y:545,w:130,h:52,t:"AvaloHost",s:"API · Keycloak · PG",c:"proj",role:"Plataforma propia con red Docker interna y su propio túnel.",kv:{Stack:"API + Keycloak 23 + 2×PostgreSQL",Backups:"pgBackRest"}},
+ {id:"wol",x:860,y:545,w:130,h:52,t:"WoL · TriggerCMD",s:"host network",c:"ctrl",role:"Envía el magic packet y ejecuta apagar/reiniciar por SSH en mi PC.",kv:{Acceso:"clave SSH montada en solo lectura",Extra:"control por voz (TriggerCMD)"}},
+ {id:"minecraft",x:1015,y:545,w:130,h:52,t:"Minecraft",s:":25565 · parado",c:"game",role:"Servidor Paper bajo demanda. Es el único DNAT de entrada configurado en el MikroTik.",kv:{Estado:"detenido",Túnel:"playit (parado)"}}
+];
+const byId=Object.fromEntries(N.map(n=>[n.id,n]));
+
+const ZONES=[
+ {x:10,y:50,w:205,h:575,l:"Internet"},
+ {x:235,y:50,w:180,h:575,l:"Casa · ISP"},
+ {x:430,y:50,w:750,h:680,l:"LAN homelab · VLAN 10 · 192.168.10.0/24"},
+ {x:645,y:85,w:525,h:600,l:"Proxmox VE · HP EliteDesk 800 G4 · .4"},
+ {x:665,y:120,w:495,h:545,l:"VM Ubuntu · Docker · .96"}
+];
+const LINKS=[
+ {p:[[215,375],[255,375]],l:"WAN"},
+ {p:[[395,375],[450,375]],l:"ether1"},
+ {p:[[325,430],[325,485]]},
+ {p:[[600,375],[685,375]],l:"ether2/3"},
+ {p:[[685,191],[685,571]]},
+ {p:[[525,430],[525,560]],l:"VLAN 10"}
+];
+
+/* ---------- escenarios ---------- */
+const SC={
+ all:{name:"Vista general",color:"--proj",sub:"Capas de la red, de fuera hacia dentro. Elige un escenario para ver cómo viaja un paquete.",nodes:null,glow:[],hops:[],steps:[
+   ["Internet → Router ISP","Primer NAT (192.168.1.0/24). Aquí también está el Wi-Fi de casa."],
+   ["Router ISP → MikroTik","El MikroTik cuelga de ether1 con IP 192.168.1.136 (segundo NAT)."],
+   ["MikroTik → VLAN 10","Bridge con vlan-filtering; ether2 y ether3 sin etiquetar en la VLAN 10. DHCP reparte Pi-hole como DNS."],
+   ["Proxmox → VM → Docker","Un HP EliteDesk con Proxmox; una VM Ubuntu ejecuta 27 contenedores en redes Docker por stack."],
+   ["Nginx Proxy Manager","Punto único de entrada web: un dominio por servicio, certificados incluidos."]]},
+ pub:{name:"Visitante público",color:"--net",sub:"Cómo llega alguien desde Internet a mi portfolio sin que haya un puerto abierto.",nodes:["visitor","cf","isp","mk","cloudflared","npm","portfolio"],glow:[],
+   hops:[
+    {p:[[112,174],[112,230]],k:"flow"},
+    {p:[[195,262],[225,262],[225,350],[255,350]],k:"flow"},
+    {p:[[395,350],[450,350]],k:"flow"},
+    {p:[[600,350],[685,350],[685,241],[910,241],[910,217]],k:"flow"},
+    {p:[[940,217],[940,265]],k:"flow"},
+    {p:[[1002,317],[1002,481],[1015,481]],k:"flow"}],
+   steps:[["El visitante abre la web","Resuelve el dominio en Cloudflare y conecta por HTTPS."],
+          ["Cloudflare lo reenvía por el túnel","cloudflared (en mi VM) abrió esa conexión hacia fuera; no hay port-forward."],
+          ["Atraviesa el router ISP","Tráfico ya establecido: sale por el mismo camino que el túnel."],
+          ["MikroTik lo entrega a la VM","Reglas de firewall: solo pasa lo ya establecido."],
+          ["cloudflared entrega a Nginx Proxy Manager","Dominio público → proxy host correspondiente."],
+          ["NPM envía al contenedor","alejandrorobotica.me → portfolio (:9090)."]]},
+ tail:{name:"Acceso remoto (Tailscale)",color:"--compute",sub:"Cómo llego yo, desde fuera, a cualquier equipo de casa como si estuviera en la LAN.",nodes:["me","ts_ext","isp","mk","ts_vm"],glow:["pihole","npm","homepage","immich","seafile","securo","barfinance","portfolio","avalohost","wol","pc"],
+   hops:[
+    {p:[[112,484],[112,540]],k:"coord"},
+    {p:[[195,452],[225,452],[225,375],[255,375]],k:"flow"},
+    {p:[[395,375],[450,375]],k:"flow"},
+    {p:[[600,360],[685,360],[685,237],[1065,237],[1065,217]],k:"flow"}],
+   steps:[["Autenticación con Tailscale","Mi dispositivo se identifica y recibe las claves y rutas del tailnet."],
+          ["Túnel WireGuard hacia casa","Atraviesa NAT de forma directa o por relay; va cifrado de extremo a extremo."],
+          ["Pasa por el router ISP y el MikroTik","El MikroTik tiene la ruta 100.64.0.0/10 → .96 para devolver las respuestas."],
+          ["Llega al subnet router","El contenedor Tailscale anuncia 192.168.10.0/24: desde aquí alcanzo Proxmox, MikroTik, PC y todos los servicios (resaltados)."]]},
+ lan:{name:"Navegación local (.lab)",color:"--sys",sub:"Qué pasa cuando desde mi PC abro http://immich.lab.",nodes:["pc","mk","pihole","npm","immich"],glow:[],
+   hops:[
+    {p:[[525,560],[525,430]],k:"flow"},
+    {p:[[600,365],[685,365],[685,191],[705,191]],k:"flow"},
+    {p:[[600,385],[685,385],[685,291],[705,291]],k:"flow"},
+    {p:[[847,317],[847,391],[860,391]],k:"flow"}],
+   steps:[["El PC pide immich.lab","Su DNS (por DHCP) es 192.168.10.96, es decir, Pi-hole."],
+          ["Pi-hole resuelve el nombre","Responde con 192.168.10.96 y bloquea anuncios y rastreadores de paso."],
+          ["La petición HTTP va a Nginx Proxy Manager","Puerto 80/443 de la VM, a través de la VLAN 10."],
+          ["NPM la reenvía a Immich","Proxy host immich.lab → 192.168.10.96:2283."]]},
+ wol:{name:"Encender mi PC (WoL)",color:"--ctrl",sub:"Un clic en Homepage enciende, reinicia o apaga el PC de trabajo.",nodes:["homepage","wol","pc"],glow:[],
+   hops:[
+    {p:[[835,391],[847,391],[847,571],[860,571]],k:"flow"},
+    {p:[[925,597],[925,700],[525,700],[525,640]],k:"flow"}],
+   steps:[["Pulso el botón en Homepage","El botón llama al contenedor wol-api."],
+          ["wol-api actúa sobre el PC","Magic packet en la VLAN 10 para encender; SSH con clave para reiniciar o apagar Windows."]]}
+};
+
+/* ---------- render estático ---------- */
+const gZ=el("g",{},svg),gL=el("g",{},svg),gH=el("g",{},svg),gN=el("g",{},svg);
+ZONES.forEach(z=>{el("rect",{x:z.x,y:z.y,width:z.w,height:z.h,rx:16,class:"zone"},gZ);
+  const t=el("text",{x:z.x+14,y:z.y+20,class:"zone-label"},gZ);t.textContent=z.l});
+const pathD=p=>"M"+p.map(q=>q.join(" ")).join(" L");
+LINKS.forEach(L=>{el("path",{d:pathD(L.p),class:"link"},gL);
+  if(L.l){const m=L.p[Math.floor(L.p.length/2)-1+0];const a=L.p[0],b=L.p[L.p.length-1];
+    const t=el("text",{x:(a[0]+b[0])/2,y:(a[1]+b[1])/2-6,class:"link-label","text-anchor":"middle"},gL);t.textContent=L.l}});
+const nodeEls={};
+N.forEach(n=>{
+  const g=el("g",{class:"node",style:`--c:${css(n.c)}`,tabindex:0,role:"button","aria-label":n.t},gN);
+  el("rect",{class:"body",x:n.x,y:n.y,width:n.w,height:n.h,rx:10},g);
+  el("rect",{class:"bar",x:n.x,y:n.y+8,width:4,height:n.h-16,rx:2},g);
+  const tt=el("text",{class:"t",x:n.x+16,y:n.y+(n.h>60?n.h/2-2:20)},g);tt.textContent=n.t;
+  const ss=el("text",{class:"s",x:n.x+16,y:n.y+(n.h>60?n.h/2+15:38)},g);ss.textContent=n.s;
+  g.addEventListener("click",()=>showNode(n.id));
+  g.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();showNode(n.id)}});
+  nodeEls[n.id]=g;
+});
+
+/* ---------- interacción ---------- */
+const $=id=>document.getElementById(id);
+function showNode(id){
+  const n=byId[id];Object.values(nodeEls).forEach(g=>g.classList.remove("sel"));nodeEls[id].classList.add("sel");
+  $("inName").textContent=n.t;$("inRole").textContent=n.role;
+  const kv=$("inKv");kv.innerHTML="";
+  const add=(k,v,html)=>{const dt=document.createElement("dt");dt.textContent=k;const dd=document.createElement("dd");
+    if(html){dd.appendChild(html)}else dd.textContent=v;kv.append(dt,dd)};
+  const tag=document.createElement("span");tag.className="tag";tag.style.setProperty("--c",css(n.c));tag.textContent=CAT[n.c];add("Categoría","",tag);
+  Object.entries(n.kv||{}).forEach(([k,v])=>add(k.replace(/_/g," "),v));
+}
+let cur="all";
+function setScenario(key){
+  cur=key;const S=SC[key];
+  document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-selected",b.dataset.k===key));
+  const hc=css(S.color.slice(2));
+  document.documentElement.style.setProperty("--hc",hc);
+  $("scTitle").textContent=S.name;$("scSub").textContent=S.sub;
+  Object.entries(nodeEls).forEach(([id,g])=>{
+    g.classList.toggle("dim",!!S.nodes&&!S.nodes.includes(id)&&!S.glow.includes(id));
+    g.classList.toggle("active",!!S.nodes&&(S.nodes.includes(id)||S.glow.includes(id)));
+  });
+  gH.innerHTML="";
+  S.hops.forEach((h,i)=>{
+    const d=pathD(h.p);
+    const path=el("path",{d,class:"hop "+h.k,style:`--hc:${hc}`,"data-i":i},gH);
+    if(!reduce&&h.k==="flow"){
+      const c=el("circle",{r:4.5,class:"dot",style:`--hc:${hc}`},gH);
+      el("animateMotion",{dur:"2.4s",repeatCount:"indefinite",begin:(i*0.5)+"s",path:d},c);
+    }
+    const b=el("g",{class:"badge",style:`--hc:${hc}`},gH);
+    el("circle",{cx:h.p[0][0],cy:h.p[0][1],r:10},b);
+    const t=el("text",{x:h.p[0][0],y:h.p[0][1]+4},b);t.textContent=i+1;
+  });
+  const ol=$("steps");ol.innerHTML="";
+  S.steps.forEach(([a,b],i)=>{
+    const li=document.createElement("li");
+    li.innerHTML=`<div><span></span><small></small></div>`;
+    li.querySelector("span").textContent=a;li.querySelector("small").textContent=b;
+    li.addEventListener("mouseenter",()=>hl(i));li.addEventListener("mouseleave",()=>hl(-1));
+    ol.appendChild(li);
+  });
+  if(!S.hops.length)ol.querySelectorAll("li").forEach(li=>li.style.cursor="default");
+}
+function hl(i){gH.querySelectorAll(".hop").forEach(p=>{
+  p.classList.toggle("hl",+p.dataset.i===i);p.classList.toggle("fade",i>=0&&+p.dataset.i!==i)})}
+const tabs=$("tabs");
+Object.entries(SC).forEach(([k,S])=>{
+  const b=document.createElement("button");b.className="tab";b.setAttribute("role","tab");b.dataset.k=k;b.textContent=S.name;
+  b.style.setProperty("--c",css(S.color.slice(2)));b.addEventListener("click",()=>setScenario(k));tabs.appendChild(b);
+});
+setScenario("all");showNode("npm");
+</script>
+</body>
+</html>

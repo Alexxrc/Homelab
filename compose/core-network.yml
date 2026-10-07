@@ -1,0 +1,49 @@
+# Núcleo de red: Pi-hole + Nginx Proxy Manager + Tailscale (subnet router)
+# Uso: cp .env.example .env && docker compose -f core-network.yml up -d
+services:
+  pihole:
+    image: pihole/pihole:latest
+    container_name: pihole
+    restart: unless-stopped
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "8080:80/tcp"
+    environment:
+      TZ: ${TZ}
+      FTLCONF_webserver_api_password: ${PIHOLE_WEB_PASSWORD}
+    volumes:
+      - pihole_config:/etc/pihole
+      - dnsmasq_config:/etc/dnsmasq.d
+
+  npm:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: nginx-proxy-manager
+    restart: unless-stopped
+    ports:
+      - "80:80"     # HTTP / validación Let's Encrypt
+      - "81:81"     # Panel de administración
+      - "443:443"   # HTTPS
+    volumes:
+      - ./npm/data:/data
+      - ./npm/letsencrypt:/etc/letsencrypt
+
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: tailscale
+    hostname: homelab-router
+    network_mode: host
+    restart: unless-stopped
+    cap_add: [NET_ADMIN, NET_RAW]
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=false
+      - TS_ROUTES=${LAN_SUBNET}
+    volumes:
+      - ./tailscale/state:/var/lib/tailscale
+      - /dev/net/tun:/dev/net/tun
+
+volumes:
+  pihole_config:
+  dnsmasq_config:

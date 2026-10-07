@@ -1,0 +1,6 @@
+.env
+*.key
+*.pem
+**/state/
+**/data/
+*-report.txt
