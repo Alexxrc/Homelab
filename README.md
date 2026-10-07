@@ -2,7 +2,7 @@
 
 Homelab personal para alojar mis propios servicios (fotos, ficheros, finanzas, DNS, portfolio) y proyectos propios, accesible de forma segura **sin abrir puertos para las webs ni para el acceso remoto**.
 
-👉 **[Abre el mapa de red interactivo](https://alexxrc.github.io/homelab/network-map.html)**: del router del ISP a cada servicio, con escenarios animados.
+👉 **[Abre el mapa de red interactivo](https://alexxrc.github.io/Homelab/network-map.html)**: del router del ISP a cada servicio, con escenarios animados.
 
 <sub>Código fuente del mapa: [`network-map.html`](network-map.html). Para verlo en local, descarga el repo y abre ese archivo con el navegador.</sub>
 
